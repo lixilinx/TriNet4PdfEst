@@ -1,1 +1,3 @@
-supporting files
+supporting files to generate stuffs like figures. 
+
+need to copy these files to the main folder to run. 
