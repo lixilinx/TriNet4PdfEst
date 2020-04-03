@@ -5,19 +5,19 @@ Check toy_density_estimate_demo and toy_data_generation_demo.
 
 ### Density estimation demos
 We consider two typical benchmarks.
-#### MNIST
-Preprocessing before density estimation: 28x28 handwritten digit images -> 784 vector -> logit transform -> add noise. The test negative-log-likelihood by our model should be below 63, i.e., below 0.12 bits per dimension. Check mnist_mono_tri_network_nll for details.
-#### CIFAR
-Preprocessing includes: 3x32x32 images -> 3072 vector -> add noise -> to range [-1, 1]. Test negative-log-likelihood by our model should be below -6110. Check cifar10_mono_tri_network_nll for details.   
+##### MNIST
+Preprocessing includes: 28x28 handwritten digit images -> 784 vector -> logit transform -> add noise. Data is normalized before feeding to the network, and normalization is a part of the model. The test negative-log-likelihood by our model is about 60, i.e., 0.11 bits per dimension. Check mnist_mono_tri_network_nll for details.
+##### CIFAR
+Preprocessing includes: 3x32x32 images -> 3072 vector -> add noise -> to range [-1, 1]. Data is normalized before feeding to the network, and normalization is a part of the model. Test negative-log-likelihood by our model is about -6120. Check cifar10_mono_tri_network_nll for details.   
 
 ### Data generation demos
 These are the typical examples for testing autoencoders. 
-### MNIST example
+##### MNIST example
 Dimension of the latent variable is 16. Samples of the original digits (top), reconstructed (middle) and randomly generated ones (bottom) are shown as below. These generated images are sharper than those from many popular methods like variational auto-encoders. Unlike GAN, the training is stable as there is just one cost to minimize. To reproduce these results, set random_init = True, and run mnist_dim_reduction, mnist_density and mnist_demo successively.         
 
 ![alt text](https://github.com/lixilinx/DensityEstimateWithEmpiricallyBijectiveMapping/blob/master/misc/mnist_demo.png)
 
-### CelebA example
+##### CelebA example
 Dimension of the latent variable is 128. Samples of the original faces (top), reconstructed (middle) and randomly generated ones (bottom) are shown as below. To reproduce these results, download CelebA, set the datasets.ImageFolder correctly and random_init = True, and run celeba_dim_reduction, celeba_density and celeba_demo successively.
 
 ![alt text](https://github.com/lixilinx/DensityEstimateWithEmpiricallyBijectiveMapping/blob/master/misc/celeba_demo.png)
