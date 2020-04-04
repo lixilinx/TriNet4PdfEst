@@ -6,9 +6,9 @@ Check toy_density_estimate_demo and toy_data_generation_demo.
 ### Density estimation demos
 We consider two typical benchmarks.
 ##### MNIST
-Preprocessing includes: 28x28 handwritten digit images -> 784 vector -> logit transform -> add noise. Data is normalized before feeding to the network, and normalization is a part of the model. The test negative-log-likelihood by our model is about 60, i.e., 0.11 bits per dimension. Check mnist_mono_tri_network_nll for details.
+Preprocessing includes: 28x28 handwritten digit images -> 784 vector -> logit transform -> add noise. Data is normalized before feeding to the network, and normalization is a part of the model. The test negative-log-likelihood by our model is about 38 (far more lower than those reported results!). Check mnist_mono_tri_network_nll for details.
 ##### CIFAR
-Preprocessing includes: 3x32x32 images -> 3072 vector -> add noise -> to range [-1, 1]. Data is normalized before feeding to the network, and normalization is a part of the model. Test negative-log-likelihood by our model is about -6120. Check cifar10_mono_tri_network_nll for details.   
+Preprocessing includes: 3x32x32 images -> 3072 vector -> add noise -> to range [-1, 1]. Data is normalized before feeding to the network, and normalization is a part of the model. Test negative-log-likelihood by our model is about -6126. Check cifar10_mono_tri_network_nll for details.   
 
 ### Data generation demos
 These are the typical examples for testing autoencoders. 
