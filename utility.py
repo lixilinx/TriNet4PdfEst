@@ -129,7 +129,9 @@ def encoding_tri_fnn(x, Ws, Ms, blk_diag_locs):
     nll = -torch.sum(torch.log(torch.abs(j_diag) + 1e-15))/batch_size + 0.5*torch.sum(x*x)/batch_size + 0.5*N*math.log(2.0*math.pi)
     return x, nll
 
-
+"""
+Only the code of monotonic triangular network part is maintained after Apr. 10, 2020
+"""
 
 def mono_tri_fnn_unit_init(N, B, device):
     """
@@ -141,32 +143,42 @@ def mono_tri_fnn_unit_init(N, B, device):
     # Input matrix and its mask 
     Mi = np.kron(np.triu(np.ones([N, N])), np.ones([1, B]))
     Mi = np.concatenate([Mi, np.ones([1, B*N])])
-    Mi = torch.FloatTensor(Mi).to(device)
-    Wi = Mi*torch.randn(N+1, B*N).to(device)/torch.sqrt(torch.sum(Mi, dim=0, keepdim=True))
+    Mi = torch.FloatTensor(Mi)
+    Wi = Mi*torch.randn(N+1, B*N)/torch.sqrt(torch.sum(Mi, dim=0, keepdim=True))
     
     # Output matrix and its mask
     Mo = np.kron(np.triu(np.ones([N, N])), np.ones([B, 1]))
     Mo = np.concatenate([Mo, np.ones([1, N])])
-    Mo = torch.FloatTensor(Mo).to(device)
-    Wo = Mo*torch.randn(B*N+1, N, device=device)/torch.sqrt(torch.sum(Mo, dim=0, keepdim=True))
+    Mo = torch.FloatTensor(Mo)
+    Wo = Mo*torch.randn(B*N+1, N)/torch.sqrt(torch.sum(Mo, dim=0, keepdim=True))
     
     # will convert diagonals to log(1 + exp(.)). So here reverse them
-    for n in range(N):
-        for b in range(B):
-            Wi[n, n*B+b] = torch.log(torch.expm1(torch.abs(Wi[n, n*B+b])))
-            Wo[n*B+b, n] = torch.log(torch.expm1(torch.abs(Wo[n*B+b, n])))
+    arng = torch.arange(B*N, dtype=torch.int64)
+    Wi[arng//B, arng] = torch.log(torch.expm1(torch.abs( Wi[arng//B, arng] )) + 1e-15)
+    Wo[arng, arng//B] = torch.log(torch.expm1(torch.abs( Wo[arng, arng//B] )) + 1e-15)
         
-    return Wi, Mi, Wo, Mo
+    return Wi.to(device), (Mi>0).to(device), Wo.to(device), (Mo>0).to(device)
 
 
-def encoding_mono_tri_fnn_unit(x, Wi, Mi, Wo, Mo):
+def encoding_mono_tri_fnn_unit(x, Wi, Mi, Wo, Mo, nonlinearity):
     """
     encoding x with a monotonic triangular feedforward neural network unit
     """    
+    def phi(x):
+        if nonlinearity == 'tanh':#this is the default nonlinearity
+            y = torch.tanh(x)
+            d = 1 - y*y
+        else:                   # example of a self-defined nonlinearity
+            d = torch.rsqrt(x*x + 1)
+            y = x*d
+            d = d*d*d
+        
+        return y, d
+        
     N = Wi.shape[0] - 1#dimension of input
     B = Wi.shape[1]//N#block size
-    Wi = Mi*Wi#apply mask
-    Wo = Mo*Wo
+    Wi = Mi.float() * Wi#apply mask
+    Wo = Mo.float() * Wo
     
     # extract the block diagonal parts
     arng = torch.arange(B*N, dtype=torch.int64)
@@ -178,8 +190,7 @@ def encoding_mono_tri_fnn_unit(x, Wi, Mi, Wo, Mo):
     delta_wo_diag = torch.logsumexp(torch.stack([wo_diag, torch.zeros_like(wo_diag)]), dim=0) - wo_diag
     
     # spread
-    x = torch.tanh( x@Wi[:-1] + Wi[-1:] + x.repeat_interleave(B, 1)*delta_wi_diag[None, :] )
-    derivative = 1.0 - x*x # d(tanh) = 1 - tanh^2
+    x, derivative = phi( x@Wi[:-1] + Wi[-1:] + x.repeat_interleave(B, 1)*delta_wi_diag[None, :] )
     j_diag = (wi_diag + delta_wi_diag)[None, :] * derivative * (wo_diag + delta_wo_diag)[None, :]
     j_diag = torch.sum(j_diag.view(-1, N, B), dim=2)#these are the diagonals of the Jacobian
     
@@ -187,7 +198,7 @@ def encoding_mono_tri_fnn_unit(x, Wi, Mi, Wo, Mo):
     x = x@Wo[:-1] + Wo[-1:] + torch.sum((x*delta_wo_diag[None, :]).view(-1, N, B), dim=2)
 
     #return the encoded results, and SumLogDet(Jacobian)
-    return x, torch.sum(torch.log(torch.abs(j_diag) + 1e-15))
+    return x, torch.sum(torch.log(j_diag + 1e-15))
     
  
 def mono_tri_fnn_init(N, Bs, device):  
@@ -208,17 +219,148 @@ def mono_tri_fnn_init(N, Bs, device):
     return Wis, Mis, Wos, Mos
 
 
-def encoding_mono_tri_fnn(x, Wis, Mis, Wos, Mos):
+def encoding_mono_tri_fnn(x, Wis, Mis, Wos, Mos, nonlinearity='tanh'):
     """
     encoding x with monotonic triangular feedforward neural network
+    default nonlinearity is tanh; otherwise, a self-defined one, see the code
     """
     batch_size, dim_input = x.shape
     
     nll = 0.0
     for i in range(len(Wis)):
-        x, sumlogdetJ = encoding_mono_tri_fnn_unit(x, Wis[i], Mis[i], Wos[i], Mos[i])
+        x, sumlogdetJ = encoding_mono_tri_fnn_unit(x, Wis[i], Mis[i], Wos[i], Mos[i], nonlinearity)
         nll = nll - sumlogdetJ
         x = torch.flip(x, [1])#reverse the order of input to balance the network
+        
+    nll = nll/batch_size + 0.5*torch.sum(x*x)/batch_size + 0.5*dim_input*math.log(2.0*math.pi)
+    return x, nll
+
+
+
+
+
+
+
+
+
+"""economy size monotonic triangular network"""
+def MonoTriNetUnitInit(N, B, device):
+    """
+    monotonic triangular network unit initialization
+    N: dimension of input and output
+    B: block size
+    device: cpu or cuda
+    """
+    # Input matrix and its mask 
+    Mi = np.kron(np.triu(np.ones([N, N])), np.ones([1, B]))
+    Mi = np.concatenate([Mi, np.ones([1, B*N])])
+    Mi = torch.FloatTensor(Mi)
+    Wi = Mi*torch.randn(N+1, B*N)/torch.sqrt(torch.sum(Mi, dim=0, keepdim=True))
+    
+    # Output matrix and its mask
+    Mo = np.kron(np.triu(np.ones([N, N])), np.ones([B, 1]))
+    Mo = np.concatenate([Mo, np.ones([1, N])])
+    Mo = torch.FloatTensor(Mo)
+    Wo = Mo*torch.randn(B*N+1, N)/torch.sqrt(torch.sum(Mo, dim=0, keepdim=True))
+    
+    # will convert diagonals to log(1 + exp(.)). So here reverse them
+    arng = torch.arange(B*N, dtype=torch.int64)
+    Wi[arng//B, arng] = torch.log(torch.expm1(torch.abs( Wi[arng//B, arng] )) + 1e-15)
+    Wo[arng, arng//B] = torch.log(torch.expm1(torch.abs( Wo[arng, arng//B] )) + 1e-15)
+    
+    # packed all into one matrix!!!
+    whole_matrix = Wi # input matrix
+    whole_matrix[:-1] += (1 - Mi[:-1])*( Wo[:-1].t() ) # then the upper part (not including the diagonals) of Wo[:-1]
+    whole_matrix = torch.cat([whole_matrix, Wo[arng, arng//B][None, :]]) # then the diagonals of Wo
+    whole_matrix = torch.cat([whole_matrix, torch.zeros(1, B*N)])# reserve some space
+    whole_matrix[-1, :N] = Wo[-1] # then the bias of Wo. B*N - N floats are not used, that is fine  
+        
+    return whole_matrix.to(device)
+
+
+def MonoTriNetUnit(x, whole_matrix, nonlinearity):
+    """
+    monotonic triangular network unit
+    x: input
+    whole_matrix: coefficients
+    nonlinearity: tanh or some self-defined ones
+    """    
+    def phi(x):
+        if nonlinearity == 'rsqrt':
+            d = torch.rsqrt(x*x + 1)
+            y = x*d
+            d = d*d*d
+        elif nonlinearity == 'log':
+            d = 1/(1 + torch.abs(x))
+            y = -torch.sign(x)*torch.log(d)
+        else:
+            y = torch.tanh(x)
+            d = 1 - y*y
+        
+        return y, d
+    
+    # unpack the whole_matrix into input matrix, input bias, output matrix (excluding diagonals), output diagonals, output bias
+    N = whole_matrix.shape[0] - 3
+    B = whole_matrix.shape[1]//N    
+    device = whole_matrix.device
+    mask = (torch.triu(torch.ones(N, N, device=device))).repeat_interleave(B, 1)#repeat dim1 B times
+    # input_matrix = mask * whole_matrix[:N]
+    input_bias = whole_matrix[-3]
+    #output_matrix = ( (1 - mask) * whole_matrix[:N] ).t()#excluding the diagonals
+    output_diag = whole_matrix[-2]
+    output_bias = whole_matrix[-1][:N]
+    
+    # extract the block diagonal parts
+    arng = torch.arange(B*N, dtype=torch.int64, device=device)
+    wi_diag = whole_matrix[arng//B, arng] #wo_diag is already there
+    
+    # additive modifications on block diagonals to transfer to log(1 + exp(.))
+    # useful relationships: log(1+exp(x)) = x - log sigmoid(x) = -log sigmoid(-x)
+    delta_wi_diag = -torch.log(torch.sigmoid( wi_diag )) #torch.logsumexp(torch.stack([wi_diag, torch.zeros_like(wi_diag)]), dim=0) - wi_diag
+    delta_wo_diag = -torch.log(torch.sigmoid(-output_diag )) #torch.logsumexp(torch.stack([output_diag, torch.zeros_like(output_diag)]), dim=0)
+    
+    # spread
+    x, derivative = phi( x @ (mask * whole_matrix[:N]) + input_bias[None,:] + x.repeat_interleave(B, 1)*delta_wi_diag[None, :] )
+    j_diag = (wi_diag + delta_wi_diag)[None, :] * derivative * delta_wo_diag[None, :]
+    j_diag = torch.sum(j_diag.view(-1, N, B), dim=2)#these are the diagonals of the Jacobian
+    
+    # collect
+    x = x @ (( (1 - mask) * whole_matrix[:N] ).t()) + output_bias[None,:] + torch.sum((x*delta_wo_diag[None, :]).view(-1, N, B), dim=2)
+
+    #return the encoded results, and SumLogDet(Jacobian)
+    return x, torch.sum(torch.log(j_diag + 1e-15))
+    
+ 
+def MonoTriNetInit(N, Bs, device):  
+    """
+    monotonic triangular network initialization
+    N: dim of input and output
+    Bs: each B in list Bs defines block sizes 1xB (input matrix) and Bx1 (output matrix) for each unit
+    device: cpu or cuda
+    """
+    Ws = []
+    for B in Bs:
+        W = MonoTriNetUnitInit(N, B, device)
+        Ws.append(W)
+        
+    return Ws
+
+
+def MonoTriNet(x, Ws, nonlinearity='tanh', flip=True):
+    """
+    monotonic triangular network
+    x: input 
+    Ws: coefficients 
+    nonlinearity: tanh or some self-defined ones
+    """
+    batch_size, dim_input = x.shape
+    
+    nll = 0.0
+    for W in Ws:
+        x, sumlogdetJ = MonoTriNetUnit(x, W, nonlinearity)
+        nll = nll - sumlogdetJ
+        if flip:
+            x = torch.flip(x, [1])#reverse the order of output to balance the network
         
     nll = nll/batch_size + 0.5*torch.sum(x*x)/batch_size + 0.5*dim_input*math.log(2.0*math.pi)
     return x, nll

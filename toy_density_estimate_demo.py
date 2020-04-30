@@ -17,17 +17,16 @@ def ring_sampling(num_samples):
             x.append(a)    
     return torch.stack(x)
     
-Wis, Mis, Wos, Mos = U.mono_tri_fnn_init(2, [50, 50], device)
-Ws = Wis + Wos
+Ws = U.MonoTriNetInit(2, [100, 100], device)
 for W in Ws:
     W.requires_grad = True
 num_para = sum([np.prod(W.size()) for W in Ws])
 Q = torch.eye(int(num_para)).to(device)
-num_samples, step_size, num_iter, grad_norm_clip_thr = 128, 0.01, 50000, 0.01*sum(W.shape[0]*W.shape[1] for W in Ws)**0.5
+num_samples, step_size, num_iter, grad_norm_clip_thr = 128, 0.1, 50000, 0.01*sum(W.shape[0]*W.shape[1] for W in Ws)**0.5
 NLL, echo_every = [], 100
 for bi in range(num_iter):
     x = ring_sampling(num_samples).to(device)
-    _, nll = U.encoding_mono_tri_fnn(x, Wis, Mis, Wos, Mos)
+    _, nll = U.MonoTriNet(x, Ws)
     NLL.append(nll.item())
     
     # PSGD optimizer. 
@@ -58,9 +57,9 @@ with torch.no_grad():
         for j in range(im_size):
             x = torch.tensor([[i+0.5, j+0.5]]).to(device)
             x = 2.2*x/im_size - 1.1
-            im[i, j] = U.encoding_mono_tri_fnn(x, Wis, Mis, Wos, Mos)[1].item()
+            im[i, j] = U.MonoTriNet(x, Ws)[1].item()
     im = np.exp(-im)
     plt.imshow(im)
     
 import pickle    
-pickle.dump([Wis, Mis, Wos, Mos], open('toy_density_estimate_demo.pkl', 'wb'))     
+pickle.dump(Ws, open('toy_density_estimate_demo.pkl', 'wb'))     
