@@ -1,7 +1,7 @@
 # Triangular network for density estimation and data generation
 A highly compact and modular monotonic triangular network is implemented. We applied it to density estimation, and achieved the-state-of-art results on challenging image density estimation benchmarks in the category of general density estimators. Please check [A Triangular Network For Density Estimation](https://arxiv.org/pdf/2004.14593.pdf) for details.   
 
-Please check utility.MonoTriNetInit and utility.MonoTriNet for usage of this network. The default activation function is tanh; use log (sign(x)log(1 + abs(x)) is bijection is a must. When several monotonic triangular network units are cascaded, by default, outputs of a unit is flipped before feeding to its successive one. You may set flip to False to disable it.     
+Please check utility.MonoTriNetInit and utility.MonoTriNet for usage of this network. The default activation function is tanh; use log, sign(x)log(1 + abs(x)), if bijection is a must. When several monotonic triangular network units are cascaded, by default, outputs of a unit is flipped before feeding to its successive one. You may set flip to False to disable it.     
 
 ### Density estimation demos
 ##### Toy demo
