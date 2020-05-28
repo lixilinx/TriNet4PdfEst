@@ -1,7 +1,7 @@
 # Triangular network for density estimation and data generation
 A highly compact and modular monotonic triangular network is implemented. We applied it to neural autoregressive flow (NAF) for density estimation, and achieved the-state-of-art results on MNIST and CIFAR-10 data sets in the category of general-purpose density estimators. 
 
-Please check report [A Triangular Network For Density Estimation](https://arxiv.org/pdf/2004.14593.pdf) for design details. Please check utility.MonoTriNetInit and utility.MonoTriNet for usage and implementation details. The default activation function is tanh; use log, sign(x)log(1 + abs(x)), if bijection is a must. When several monotonic triangular network units are cascaded, by default, outputs of each unit is flipped before feeding to its successive one. You may set flip to False to disable it.     
+Please check report [A Triangular Network For Density Estimation](https://arxiv.org/abs/2004.14593) for design details. Please check utility.MonoTriNetInit and utility.MonoTriNet for usage and implementation details. The default activation function is tanh; use log, sign(x)log(1 + abs(x)), if bijection is a must. When several monotonic triangular network units are cascaded, by default, outputs of each unit is flipped before feeding to its successive one. You may set flip to False to disable it.     
 
 ### Density estimation demos
 ##### Toy demo
