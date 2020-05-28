@@ -31,7 +31,7 @@ for bi in range(num_iter):
     
     # PSGD optimizer. 
     Q_update_gap = max(math.floor(math.log10(bi + 1)), 1)
-    if num_iter % Q_update_gap == 0:
+    if bi % Q_update_gap == 0:
         grads = grad(nll, Ws, create_graph=True)     
         v = [torch.randn(W.shape, device=device) for W in Ws]
         Hv = grad(grads, Ws, v)      
