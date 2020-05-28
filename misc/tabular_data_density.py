@@ -1,3 +1,8 @@
+"""
+External dependences:
+https://zenodo.org/record/1161203#.XtAJfkBFxu2
+https://github.com/rtqichen/ffjord/tree/master/datasets
+"""
 import matplotlib.pyplot as plt
 import torch
 from torch.autograd import grad
